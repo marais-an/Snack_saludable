@@ -1,0 +1,2023 @@
+{
+  "name": "Es Saludable Este Snack?",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nutrition-check",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -400,
+        0
+      ],
+      "id": "df2ade3f-1ba5-41cd-9a13-41d221f75291",
+      "name": "Entrada - Solicitud de código de barras",
+      "webhookId": "59be32b0-e8c9-4fb2-b103-dd76774525fa",
+      "notesInFlow": true,
+      "notes": "Recibe una solicitud POST en /nutrition-check con el campo barcode en el cuerpo JSON. La respuesta se devuelve mediante los nodos Respond to Webhook."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ba2c615c-2c37-4f23-8e93-7580b57dcf36",
+              "leftValue": "={{ $json.body.barcode }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -144,
+        0
+      ],
+      "id": "40b89c73-3129-40fe-8093-f638b052c78d",
+      "name": "Validacion - Existe barcode",
+      "notesInFlow": true,
+      "notes": "Comprueba que el campo barcode esté presente y no esté vacío. Si contiene un valor, continúa con la validación numérica. Si falta o está vacío, devuelve un error JSON con HTTP 400 y un ejemplo de uso."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bd6011df-7361-4c2f-9ba5-56ae5c523a8c",
+              "leftValue": "={{ $json.body.barcode }}",
+              "rightValue": "^\\d+$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        48,
+        -112
+      ],
+      "id": "45cd0ad6-ed60-451a-8684-88eeedc7f20f",
+      "name": "Validacion - Barcode numerico",
+      "notesInFlow": true,
+      "notes": "Comprueba que barcode contenga únicamente números mediante la expresión regular ^\\d+$. Si es válido, consulta Open Food Facts. Si contiene otros caracteres, devuelve un error JSON con HTTP 400 y un ejemplo válido."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"estado\": \"error\",\n  \"codigo\": \"CODIGO_BARRAS_FALTANTE\",\n  \"mensaje\": \"Necesito un codigo de barras para poder analizar el producto.\",\n  \"servicio\": \"Este servicio revisa los datos nutricionales de un producto y devuelve un veredicto sencillo.\",\n  \"campo_requerido\": \"barcode\",\n  \"ejemplo\": {\n    \"barcode\": \"3017620422003\"\n  }\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        32,
+        176
+      ],
+      "id": "a6a97a64-5f22-47ea-a79b-c1808d1ca0ee",
+      "name": "Respuesta - Barcode faltante",
+      "notesInFlow": true,
+      "notes": "Devuelve un error JSON con HTTP 400 y código CODIGO_BARRAS_FALTANTE cuando barcode falta o está vacío. Incluye una descripción del servicio, el campo requerido y un ejemplo de solicitud válida."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"estado\": \"error\",\n  \"codigo\": \"BARCODE_NO_NUMERICO\",\n  \"mensaje\": \"Parece que el codigo de barras no es valido. Debe contener solo numeros.\",\n  \"ejemplo\": {\n    \"barcode\": \"3017620422003\"\n  }\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        304,
+        48
+      ],
+      "id": "b1582b75-7816-446c-96c4-5a12cee39d47",
+      "name": "Respuesta - Barcode no numerico",
+      "notesInFlow": true,
+      "notes": "Devuelve un error JSON con HTTP 400 y código BARCODE_NO_NUMERICO cuando barcode contiene caracteres distintos de números. Explica el formato requerido e incluye un ejemplo válido."
+    },
+    {
+      "parameters": {
+        "url": "=https://world.openfoodfacts.org/api/v2/product/{{ $json.body.barcode }}.json?fields=product_name,brands,nutriscore_grade,nutriments",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        320,
+        -192
+      ],
+      "id": "9d1cf490-225c-47a5-a0b8-8f8558361558",
+      "name": "Consulta - Open Food Facts",
+      "notesInFlow": true,
+      "notes": "Consulta la API de Open Food Facts mediante GET usando el barcode recibido. Solicita nombre, marca, Nutri-Score y nutrientes, sin clave API. La opción Never Error permite que una respuesta HTTP de producto no encontrado continúe hacia la validación y reciba una respuesta propia del flujo."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9571879a-2378-481f-bac8-fbb41d848d68",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        560,
+        -192
+      ],
+      "id": "e23e336d-e944-4daf-84dc-6ff8ff8e9e13",
+      "name": "Validacion - Producto encontrado",
+      "notesInFlow": true,
+      "notes": "Comprueba que Open Food Facts devuelva status igual a 1. Si el producto existe, continúa con la extracción de datos. Si no existe, dirige la solicitud a la respuesta de producto no encontrado con HTTP 404."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"estado\": \"error\",\n  \"codigo\": \"PRODUCTO_NO_ENCONTRADO\",\n  \"mensaje\": \"No encontre un producto con ese codigo de barras.\",\n  \"ejemplo\": {\n    \"barcode\": \"3017620422003\"\n  }\n}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        768,
+        -64
+      ],
+      "id": "f3a87400-d0d4-4efd-9b3a-5e35c8c6df07",
+      "name": "Respuesta - Producto no encontrado",
+      "notesInFlow": true,
+      "notes": "Devuelve un error JSON con HTTP 404 y código PRODUCTO_NO_ENCONTRADO cuando Open Food Facts no encuentra el producto. Incluye un mensaje claro y un ejemplo de código de barras."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "851bf062-d992-4a9c-b0af-43dfca354b19",
+              "name": "nombre",
+              "value": "={{ $json.product.product_name }}",
+              "type": "string"
+            },
+            {
+              "id": "b42e4532-57fe-4673-ad4c-f2000efaf421",
+              "name": "marca",
+              "value": "={{ $json.product.brands }}",
+              "type": "string"
+            },
+            {
+              "id": "a3609ada-a5c9-4750-b237-1059d0e652e0",
+              "name": "nutriscore",
+              "value": "={{ $json.product.nutriscore_grade }}",
+              "type": "string"
+            },
+            {
+              "id": "4b8f7e20-0ac4-4ddd-bf1d-d7151d61d44d",
+              "name": "azucar_100g",
+              "value": "={{ $json.product.nutriments.sugars_100g }}",
+              "type": "number"
+            },
+            {
+              "id": "9e345ed9-473a-48ff-92f0-893358b88f8e",
+              "name": "sal_100g",
+              "value": "={{ $json.product.nutriments.salt_100g }}",
+              "type": "number"
+            },
+            {
+              "id": "edf50f8a-4c5d-4be6-af93-365e40d62323",
+              "name": "grasa_100g",
+              "value": "={{ $json.product.nutriments.fat_100g }}",
+              "type": "number"
+            },
+            {
+              "id": "130b0ca4-9b52-4ed2-8869-0f925d513344",
+              "name": "energia_100g",
+              "value": "={{ $json.product.nutriments['energy-kcal_100g'] }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        784,
+        -288
+      ],
+      "id": "e1a59384-fa6f-451e-a4f0-1485fe7c40d6",
+      "name": "Datos - Extraer informacion nutricional",
+      "notesInFlow": true,
+      "notes": "Extrae nombre, marca, Nutri-Score, azúcar, sal, grasa y energía por 100 g. Accede al campo de energía con notación de corchetes: nutriments['energy-kcal_100g']. Prepara estos datos para la validación y clasificación nutricional."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e386b741-dcfd-455a-99fa-a00bdae16612",
+              "leftValue": "={{ $json.azucar_100g }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "6981e494-606c-4721-867d-715812e9b75f",
+              "leftValue": "={{ $json.sal_100g }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "29fd5316-c52c-40a3-96e8-1cbef85cfdcd",
+              "leftValue": "={{ $json.grasa_100g }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        976,
+        -288
+      ],
+      "id": "a52643e9-5448-430f-9bfb-a16eae09b061",
+      "name": "Validacion - Datos nutricionales",
+      "notesInFlow": true,
+      "notes": "Comprueba que estén disponibles los valores de azúcar, sal y grasa por 100 g. Si están completos, continúa con la clasificación. Si falta alguno, devuelve un JSON con estado sin_datos y HTTP 200, sin emitir un veredicto."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"estado\": \"sin_datos\",\n  \"mensaje\": \"Encontré el producto, pero no tiene suficiente información nutricional para darte un veredicto confiable.\",\n  \"detalle\": \"Necesito los datos de azúcar, sal y grasa por 100 g para poder evaluarlo correctamente.\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1168,
+        -64
+      ],
+      "id": "fb98b9fb-1906-4c29-9ac6-7b55fb6bcc15",
+      "name": "Respuesta - Datos insuficientes",
+      "notesInFlow": true,
+      "notes": "Devuelve un JSON con HTTP 200 y estado sin_datos cuando el producto existe, pero falta algún valor de azúcar, sal o grasa por 100 g. Explica qué información se necesita, sin emitir un veredicto ni llamar a la IA."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9f234edc-1f02-448d-96dc-5d1bf98f5e25",
+              "leftValue": "={{ $json.azucar_100g }}",
+              "rightValue": 22.5,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1152,
+        -400
+      ],
+      "id": "c5694a23-42cc-4604-87e5-f5c85b4df659",
+      "name": "Clasificacion - Azucar alta",
+      "notesInFlow": true,
+      "notes": "Comprueba si el azúcar supera 22.5 g por 100 g. Si lo supera, dirige el producto a Nivel de azucar = Alto. Si no, continúa comprobando si el nivel es Medio o Bajo."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "af13c960-6a8e-40a2-8eee-b51740444d33",
+              "leftValue": "={{ $json.azucar_100g }}",
+              "rightValue": 5,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1392,
+        -224
+      ],
+      "id": "9416f8a5-ad5d-4275-8948-34ddd4df361d",
+      "name": "Clasificacion - Azucar media",
+      "notesInFlow": true,
+      "notes": "Recibe los productos cuyo azúcar no supera 22.5 g por 100 g. Comprueba si el valor es mayor o igual a 5: si lo es, dirige a nivel Medio; si es menor, dirige a nivel Bajo."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dd95645a-0d75-4c38-8712-cf33c7752a04",
+              "name": "Nivel de azucar",
+              "value": "Alto",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1616,
+        -416
+      ],
+      "id": "a672a0b0-d8a8-4592-87fb-36116403d123",
+      "name": "Datos - Azucar alto",
+      "notesInFlow": true,
+      "notes": "Añade el campo Nivel de azucar con el valor Alto y conserva los demás datos del producto. Continúa con la clasificación de la sal."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cb6b222b-3db4-45cb-8861-cd0add15b924",
+              "name": "Nivel de azucar",
+              "value": "Medio",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1616,
+        -224
+      ],
+      "id": "738bf195-39ed-46e5-9a05-07951c8fcb7b",
+      "name": "Datos - Azucar medio",
+      "notesInFlow": true,
+      "notes": "Añade el campo Nivel de azucar con el valor Medio para productos con entre 5 y 22.5 g de azúcar por 100 g. Conserva los demás datos y continúa con la clasificación de la sal."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "82ac3932-9b3f-44ce-9107-a2c00cbb244a",
+              "name": "Nivel de azucar",
+              "value": "Bajo",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1632,
+        -16
+      ],
+      "id": "96d12ba1-68dd-41a4-bf17-36db7ca01504",
+      "name": "Datos - Azucar bajo",
+      "notesInFlow": true,
+      "notes": "Añade el campo Nivel de azucar con el valor Bajo para productos con menos de 5 g de azúcar por 100 g. Conserva los demás datos y continúa con la clasificación de la sal."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9e0a9bac-30c4-4f23-a95b-848361a06b34",
+              "leftValue": "={{ $json.sal_100g }}",
+              "rightValue": 1.5,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1904,
+        -288
+      ],
+      "id": "d38d298a-d9a0-42aa-a7f1-beacd14fc859",
+      "name": "Clasificacion - Sal alta",
+      "notesInFlow": true,
+      "notes": "Comprueba si la sal supera 1.5 g por 100 g. Si lo supera, dirige a Nivel de sal = Alto. Si es igual o inferior, dirige a Nivel de sal = No alto."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "db23167d-079b-44dd-8219-82d6168fbdf9",
+              "name": "Nivel de sal",
+              "value": "Alto",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2112,
+        -416
+      ],
+      "id": "06525d56-88a3-45e7-b304-80ef6af4eb91",
+      "name": "Datos - Sal alta",
+      "notesInFlow": true,
+      "notes": "Añade el campo Nivel de sal con el valor Alto para productos con más de 1.5 g de sal por 100 g. Conserva los demás datos y continúa con la clasificación de la grasa."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7372b3fc-882c-4075-9bc4-353cb8593deb",
+              "name": "Nivel de sal",
+              "value": "No alto",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2128,
+        -128
+      ],
+      "id": "89fdaab9-9408-46c5-bbfb-991cb2b93e12",
+      "name": "Datos - Sal no alta",
+      "notesInFlow": true,
+      "notes": "Añade el campo Nivel de sal con el valor No alto para productos con 1.5 g de sal por 100 g o menos. Conserva los demás datos y continúa con la clasificación de la grasa."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f6659828-0309-4b60-bacc-4c0ffe36e512",
+              "leftValue": "={{ $json.grasa_100g }}",
+              "rightValue": 17.5,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2336,
+        -288
+      ],
+      "id": "d834d44b-6b0d-493f-9932-af1d3df69f88",
+      "name": "Clasificacion - Grasa alta",
+      "notesInFlow": true,
+      "notes": "Comprueba si la grasa supera 17.5 g por 100 g. Si lo supera, dirige a Nivel de grasa = Alto. Si es igual o inferior, dirige a Nivel de grasa = No alto."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "707dc813-9da6-4a21-b180-a288ac049825",
+              "name": "Nivel de grasa",
+              "value": "Alto",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2544,
+        -416
+      ],
+      "id": "026a4c79-a7e0-4977-b86f-664d68b471a2",
+      "name": "Datos - Grasa alta",
+      "notesInFlow": true,
+      "notes": "Añade el campo Nivel de grasa con el valor Alto para productos con más de 17.5 g de grasa por 100 g. Conserva los demás datos y continúa con el cálculo de la puntuación de preocupación."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6c9be4f9-1eea-4322-ba69-6a5acaf5af75",
+              "name": "Nivel de grasa",
+              "value": "No alto",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2544,
+        -128
+      ],
+      "id": "5aba398a-dc07-48ba-b85b-e7cb372e4a5c",
+      "name": "Datos - Grasa no alta",
+      "notesInFlow": true,
+      "notes": "Añade el campo Nivel de grasa con el valor No alto para productos con 17.5 g de grasa por 100 g o menos. Conserva los demás datos y continúa con el cálculo de la puntuación de preocupación."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "88a02f8d-a783-4e05-b97f-2cee4b997b2c",
+              "leftValue": "={{ $json.puntuacion_preocupacion }}",
+              "rightValue": 2,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2992,
+        -288
+      ],
+      "id": "5758081e-6076-459d-9d5f-e6148a461f72",
+      "name": "Clasificacion - Semaforo no saludable",
+      "notesInFlow": true,
+      "notes": "Comprueba si puntuacion_preocupacion es mayor o igual a 2. Si hay dos o tres nutrientes altos, dirige al semáforo No saludable. Si hay menos, continúa comprobando si corresponde Moderado o Saludable."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1ddceeba-a197-4c2f-96f5-05f29e8f253a",
+              "leftValue": "={{ $json.puntuacion_preocupacion }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3184,
+        -176
+      ],
+      "id": "555e255e-441f-40c6-bc77-d3f4377fa686",
+      "name": "Clasificacion - Semaforo moderado",
+      "notesInFlow": true,
+      "notes": "Recibe productos con menos de dos nutrientes altos. Comprueba si puntuacion_preocupacion es igual a 1: si lo es, dirige al semáforo Moderado; si es 0, dirige al semáforo Saludable."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9bed6700-0f4d-4b6a-8137-1b686265e3c7",
+              "name": "Resultado semaforo",
+              "value": "No saludable",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        3392,
+        -448
+      ],
+      "id": "94a378e8-29b1-4986-a613-771d13fc90a3",
+      "name": "Datos - Semaforo no saludable",
+      "notesInFlow": true,
+      "notes": "Añade el campo Resultado semaforo con el valor No saludable porque hay dos o tres nutrientes altos. Conserva los demás datos y continúa con la validación del Nutri-Score."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f216eb71-00b7-4cbb-bcf1-01c7091dbf9a",
+              "name": "Resultado semaforo",
+              "value": "Moderado",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        3392,
+        -240
+      ],
+      "id": "10f32a16-51b1-46f0-a2c3-a20dd8afc136",
+      "name": "Datos - Semaforo moderado",
+      "notesInFlow": true,
+      "notes": "Añade el campo Resultado semaforo con el valor Moderado porque hay un solo nutriente alto. Conserva los demás datos y continúa con la validación del Nutri-Score."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "537942db-228c-400f-bee0-afb0bdecaa9c",
+              "name": "Resultado semaforo",
+              "value": "Saludable",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        3392,
+        -32
+      ],
+      "id": "523b770e-bd9a-40ba-a30f-52ad83645d39",
+      "name": "Datos - Semaforo saludable",
+      "notesInFlow": true,
+      "notes": "Añade el campo Resultado semaforo con el valor Saludable porque no hay nutrientes altos. Conserva los demás datos y continúa con la validación del Nutri-Score."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "695fde67-dfc9-4198-91db-659575e51d82",
+              "leftValue": "={{ $json.nutriscore }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "27dbf5a4-ae4c-40dc-9eb3-fa2913fbe0a6",
+              "leftValue": "={{ $json.nutriscore }}",
+              "rightValue": "unknown",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3680,
+        -272
+      ],
+      "id": "73b755b1-77dc-4a40-a324-650133c19922",
+      "name": "Validacion - Nutriscore disponible",
+      "notesInFlow": true,
+      "notes": "Comprueba que nutriscore no esté vacío ni sea unknown. Si está disponible, continúa con su clasificación. Si falta o es unknown, pasa a la clasificación del veredicto final utilizando únicamente Resultado semaforo."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5599df52-23e5-4dc3-81f0-9937ab953ba9",
+              "leftValue": "={{ $json.nutriscore }}",
+              "rightValue": "d",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "346e27b4-7327-4517-8efe-180920cc17b2",
+              "leftValue": "={{ $json.nutriscore }}",
+              "rightValue": "e",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3872,
+        -400
+      ],
+      "id": "ae057b44-f40e-4261-8ff0-2db4d3018103",
+      "name": "Clasificacion - Nutriscore no saludable",
+      "notesInFlow": true,
+      "notes": "Comprueba si nutriscore es d o e. Si coincide, dirige a la clasificación No saludable. Si no, continúa comprobando si corresponde Moderado o Saludable."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c567c127-ed4f-4c6f-a9f7-539fc43fd726",
+              "name": "Resultado nutriscore",
+              "value": "No saludable",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        4288,
+        -496
+      ],
+      "id": "129c8687-b0d0-469f-a79a-e694962192eb",
+      "name": "Datos - Nutriscore no saludable",
+      "notesInFlow": true,
+      "notes": "Añade el campo Resultado nutriscore con el valor No saludable para un Nutri-Score d o e. Conserva los demás datos y pasa a Unir - Resultado Nutriscore."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d2ab63b1-a1d1-47f5-89d6-9371715e0052",
+              "leftValue": "={{ $json.nutriscore }}",
+              "rightValue": "c",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4064,
+        -272
+      ],
+      "id": "8d4baa68-390f-468f-97f3-16a1ebf65c29",
+      "name": "Clasificacion - Nutriscore moderado",
+      "notesInFlow": true,
+      "notes": "Recibe productos cuyo Nutri-Score no es d ni e. Comprueba si nutriscore es c: si coincide, dirige a Moderado; si no, continúa hacia Saludable, correspondiente a a o b."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5962ad0f-e990-457b-bc18-c1e5271f86f6",
+              "name": "Resultado nutriscore",
+              "value": "Moderado",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        4288,
+        -304
+      ],
+      "id": "e1bc555a-cd12-4d16-b528-6ca8a9231213",
+      "name": "Datos - Nutriscore moderado",
+      "notesInFlow": true,
+      "notes": "Añade el campo Resultado nutriscore con el valor Moderado para un Nutri-Score c. Conserva los demás datos y pasa a Unir - Resultado Nutriscore."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "15c066a7-0ee9-49de-a3ff-f688ef55d0e7",
+              "name": "Resultado nutriscore",
+              "value": "Saludable",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        4288,
+        -64
+      ],
+      "id": "3f7368f4-8a7f-490d-968f-f64c89f6c48c",
+      "name": "Datos - Nutriscore saludable",
+      "notesInFlow": true,
+      "notes": "Añade el campo Resultado nutriscore con el valor Saludable para la rama correspondiente a Nutri-Score a o b. Conserva los demás datos y pasa a Unir - Resultado Nutriscore."
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        4544,
+        -272
+      ],
+      "id": "51b6f259-3790-46e3-b456-b660a5ea2c25",
+      "name": "Unir - Resultado Nutriscore",
+      "notesInFlow": true,
+      "notes": "Reúne las tres ramas de clasificación del Nutri-Score en modo Append. Pasa los datos de la rama utilizada a la clasificación del veredicto final para compararlos con Resultado semaforo."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "56d469f0-feff-4397-87e7-d33daa49adf1",
+              "leftValue": "={{ $json[\"Resultado semaforo\"] }}",
+              "rightValue": "No saludable",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "9235255d-d63b-46a2-b601-3039f3314467",
+              "leftValue": "={{ $json[\"Resultado nutriscore\"] }}",
+              "rightValue": "No saludable",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4736,
+        -256
+      ],
+      "id": "8d5f9279-70cf-4664-8497-aa63daa242b5",
+      "name": "Clasificacion - Veredicto final no saludable",
+      "notesInFlow": true,
+      "notes": "Comprueba si Resultado semaforo o Resultado nutriscore es No saludable. Si cualquiera lo es, dirige al veredicto final No saludable. Si ninguno lo es, continúa comprobando Moderado. Cuando no hay Nutri-Score, utiliza únicamente el semáforo."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7e6282bd-e603-4979-b31d-c2fe016430c1",
+              "leftValue": "={{ $json[\"Resultado semaforo\"] }}",
+              "rightValue": "Moderado",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "8aad8985-c0a4-4c68-9ae1-02fc642f66ea",
+              "leftValue": "={{ $json[\"Resultado nutriscore\"] }}",
+              "rightValue": "Moderado",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4944,
+        -160
+      ],
+      "id": "0d0bc9ab-b505-45ae-a00c-2ac22d8d5253",
+      "name": "Clasificacion - Veredicto final moderado",
+      "notesInFlow": true,
+      "notes": "Recibe productos que no han sido clasificados como No saludable. Si Resultado semaforo o Resultado nutriscore es Moderado, dirige al veredicto final Moderado. Si ninguno lo es, dirige a Saludable. Cuando falta Nutri-Score, utiliza únicamente el semáforo."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b70a6f41-8eb8-4bf8-bb26-5cdd0b273dc6",
+              "name": "Resultado final",
+              "value": "No saludable",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        5152,
+        -448
+      ],
+      "id": "acc06982-d12b-4da3-93cf-c2bfb5fb8230",
+      "name": "Datos - Veredicto final no saludable",
+      "notesInFlow": true,
+      "notes": "Añade el campo Resultado final con el valor No saludable y conserva los datos del producto. Los envía a IA - Veredicto no saludable para generar una explicación con tono cauteloso."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e2b44cba-57e1-4eb1-8a1b-c51b8aee649c",
+              "name": "Resultado final",
+              "value": "Moderado",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        5152,
+        -256
+      ],
+      "id": "1a46479e-e1f4-4fe8-a52b-36c423f84a2a",
+      "name": "Datos - Veredicto final moderado",
+      "notesInFlow": true,
+      "notes": "Añade el campo Resultado final con el valor Moderado y conserva los datos del producto. Los envía a IA - Veredicto moderado para generar una explicación con tono positivo y equilibrado."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0d922fbc-0fec-43ae-a6dc-6651998f1ba4",
+              "name": "Resultado final",
+              "value": "Saludable",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        5152,
+        -32
+      ],
+      "id": "121635a9-d092-4850-a05a-0ac58ee6636c",
+      "name": "Datos - Veredicto final saludable",
+      "notesInFlow": true,
+      "notes": "Añade el campo Resultado final con el valor Saludable y conserva los datos del producto. Los envía a IA - Veredicto saludable para generar una explicación con tono positivo y alentador."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Escribe un párrafo corto y claro sobre este producto.\n\nProducto: {{ $json.nombre }}\nAzúcar por 100 g: {{ $json[\"azucar_100g\"] }}\nSal por 100 g: {{ $json[\"sal_100g\"] }}\nGrasa por 100 g: {{ $json[\"grasa_100g\"] }}\nNivel de azúcar: {{ $json[\"Nivel de azucar\"] }}\nNivel de sal: {{ $json[\"Nivel de sal\"] }}\nNivel de grasa: {{ $json[\"Nivel de grasa\"] }}\nResultado final: {{ $json[\"Resultado final\"] }}\n\nEl tono debe ser cauteloso, amable y algo gracioso. Explica de forma sencilla que este producto es mejor consumirlo de forma ocasional, sin sonar alarmista.",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        5344,
+        -448
+      ],
+      "id": "d0142dab-d1e8-4e77-a6ca-ba24868ebd56",
+      "name": "IA - Veredicto no saludable",
+      "notesInFlow": true,
+      "notes": "Utiliza el modelo Groq para generar un párrafo breve con tono cauteloso y amable, recomendando un consumo ocasional. Recibe los datos del producto y el veredicto ya calculado; su función es explicarlo, no decidir la clasificación."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Escribe un párrafo corto y claro sobre este producto.\n\nProducto: {{ $json.nombre }}\nAzúcar por 100 g: {{ $json[\"azucar_100g\"] }}\nSal por 100 g: {{ $json[\"sal_100g\"] }}\nGrasa por 100 g: {{ $json[\"grasa_100g\"] }}\nNivel de azúcar: {{ $json[\"Nivel de azucar\"] }}\nNivel de sal: {{ $json[\"Nivel de sal\"] }}\nNivel de grasa: {{ $json[\"Nivel de grasa\"] }}\nResultado final: {{ $json[\"Resultado final\"] }}\n\nEl tono debe ser positivo, amable y equilibrado. Explica brevemente por qué el producto recibió el veredicto Moderado según los datos proporcionados y recomienda consumirlo con moderación. No inventes beneficios ni cambies el veredicto calculado por el flujo.",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        5344,
+        -256
+      ],
+      "id": "561cc5b1-1018-4ad3-9202-ec5035b659b3",
+      "name": "IA - Veredicto moderado",
+      "notesInFlow": true,
+      "notes": "Utiliza el modelo Groq para generar un párrafo breve con tono positivo, amable y equilibrado, recomendando moderación. Explica el veredicto Moderado a partir de los datos recibidos, sin cambiar la clasificación ni inventar beneficios."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Escribe un párrafo corto y claro sobre este producto.\n\nProducto: {{ $json.nombre }}\nAzúcar por 100 g: {{ $json[\"azucar_100g\"] }}\nSal por 100 g: {{ $json[\"sal_100g\"] }}\nGrasa por 100 g: {{ $json[\"grasa_100g\"] }}\nNivel de azúcar: {{ $json[\"Nivel de azucar\"] }}\nNivel de sal: {{ $json[\"Nivel de sal\"] }}\nNivel de grasa: {{ $json[\"Nivel de grasa\"] }}\nResultado final: {{ $json[\"Resultado final\"] }}\n\nEl tono debe ser positivo, amable y alentador. Explica brevemente por qué el producto recibió el veredicto Saludable según los datos proporcionados. No inventes beneficios ni cambies el veredicto calculado por el flujo.",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        5344,
+        -32
+      ],
+      "id": "44da3ad5-6863-436a-91a8-0dff2c3abcdc",
+      "name": "IA - Veredicto saludable",
+      "notesInFlow": true,
+      "notes": "Utiliza el modelo Groq para generar un párrafo breve con tono positivo, amable y alentador. Explica el veredicto Saludable a partir de los datos recibidos, sin cambiar la clasificación ni inventar beneficios."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "412ab672-348e-4a38-825e-b8d1e13cea8f",
+              "name": "Respuesta final",
+              "value": "={{\n\"🍫 ¿Es saludable este snack?\\n\\n\" +\n\"Producto: \" + $(\"Datos - Veredicto final no saludable\").item.json.nombre + \"\\n\" +\n\"Veredicto: 🔴 \" + $(\"Datos - Veredicto final no saludable\").item.json[\"Resultado final\"] + \"\\n\\n\" +\n($(\"Datos - Veredicto final no saludable\").item.json[\"Nivel de azucar\"] === \"Alto\" ? \"🔴\" : \"🟢\") +\n\" Azúcar: \" + $(\"Datos - Veredicto final no saludable\").item.json.azucar_100g + \" g/100 g\\n\" +\n($(\"Datos - Veredicto final no saludable\").item.json[\"Nivel de sal\"] === \"Alto\" ? \"🔴\" : \"🟢\") +\n\" Sal: \" + $(\"Datos - Veredicto final no saludable\").item.json.sal_100g + \" g/100 g\\n\" +\n($(\"Datos - Veredicto final no saludable\").item.json[\"Nivel de grasa\"] === \"Alto\" ? \"🔴\" : \"🟢\") +\n\" Grasa: \" + $(\"Datos - Veredicto final no saludable\").item.json.grasa_100g + \" g/100 g\\n\\n\" +\n\"💬 \" + $json.text\n}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        5648,
+        -448
+      ],
+      "id": "78710197-cf06-4fa9-88ce-f5c481b3c4bd",
+      "name": "Formato - Respuesta no saludable",
+      "notesInFlow": true,
+      "notes": "Construye el mensaje final con el nombre del producto, el veredicto No saludable, los valores de azúcar, sal y grasa por 100 g y la explicación de la IA. Muestra el veredicto en rojo y el marcador de cada nutriente según su nivel."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "39c58189-d7ec-4b58-aa09-d9e4113d3639",
+              "name": "Respuesta final",
+              "value": "={{ \n\"🍫 ¿Es saludable este snack?\\n\\n\" +\n\"Producto: \" + $(\"Datos - Veredicto final moderado\").item.json.nombre + \"\\n\" +\n\"Veredicto: 🟡 \" + $(\"Datos - Veredicto final moderado\").item.json[\"Resultado final\"] + \"\\n\\n\" +\n($(\"Datos - Veredicto final moderado\").item.json[\"Nivel de azucar\"] === \"Alto\" ? \"🔴\" : \"🟢\") +\n\" Azúcar: \" + $(\"Datos - Veredicto final moderado\").item.json.azucar_100g + \" g/100 g\\n\" +\n($(\"Datos - Veredicto final moderado\").item.json[\"Nivel de sal\"] === \"Alto\" ? \"🔴\" : \"🟢\") +\n\" Sal: \" + $(\"Datos - Veredicto final moderado\").item.json.sal_100g + \" g/100 g\\n\" +\n($(\"Datos - Veredicto final moderado\").item.json[\"Nivel de grasa\"] === \"Alto\" ? \"🔴\" : \"🟢\") +\n\" Grasa: \" + $(\"Datos - Veredicto final moderado\").item.json.grasa_100g + \" g/100 g\\n\\n\" +\n\"💬 \" + $json.text\n}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        5648,
+        -256
+      ],
+      "id": "1b8f9f8a-d190-410f-ace8-0e9a5fbb29a2",
+      "name": "Formato - Respuesta moderada",
+      "notesInFlow": true,
+      "notes": "Construye el mensaje final con el nombre del producto, el veredicto Moderado, los valores de azúcar, sal y grasa por 100 g y la explicación de la IA. Muestra el veredicto en amarillo y cada nutriente en rojo si es Alto o en verde si no lo es."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f12b50a1-221b-4051-acba-5285d116627e",
+              "name": "Respuesta final",
+              "value": "={{ \n\"🍫 ¿Es saludable este snack?\\n\\n\" +\n\"Producto: \" + $(\"Datos - Veredicto final saludable\").item.json.nombre + \"\\n\" +\n\"Veredicto: 🟢 \" + $(\"Datos - Veredicto final saludable\").item.json[\"Resultado final\"] + \"\\n\\n\" +\n($(\"Datos - Veredicto final saludable\").item.json[\"Nivel de azucar\"] === \"Alto\" ? \"🔴\" : \"🟢\") +\n\" Azúcar: \" + $(\"Datos - Veredicto final saludable\").item.json.azucar_100g + \" g/100 g\\n\" +\n($(\"Datos - Veredicto final saludable\").item.json[\"Nivel de sal\"] === \"Alto\" ? \"🔴\" : \"🟢\") +\n\" Sal: \" + $(\"Datos - Veredicto final saludable\").item.json.sal_100g + \" g/100 g\\n\" +\n($(\"Datos - Veredicto final saludable\").item.json[\"Nivel de grasa\"] === \"Alto\" ? \"🔴\" : \"🟢\") +\n\" Grasa: \" + $(\"Datos - Veredicto final saludable\").item.json.grasa_100g + \" g/100 g\\n\\n\" +\n\"💬 \" + $json.text\n}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        5648,
+        -32
+      ],
+      "id": "d41c1dac-b6eb-4c8a-b6ca-1dcad99a5889",
+      "name": "Formato - Respuesta saludable",
+      "notesInFlow": true,
+      "notes": "Construye el mensaje final con el nombre del producto, el veredicto Saludable, los valores de azúcar, sal y grasa por 100 g y la explicación de la IA. Muestra el veredicto en verde y cada nutriente en rojo si es Alto o en verde si no lo es."
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        5888,
+        -272
+      ],
+      "id": "807d2577-6a35-4b93-82bb-859a955ca112",
+      "name": "Unir - Respuesta final",
+      "notesInFlow": true,
+      "notes": "Reúne las tres ramas de respuesta en modo Append. Envía el campo Respuesta final de la rama utilizada al nodo Respuesta - Resultado final."
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json[\"Respuesta final\"] }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/plain; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        6112,
+        -256
+      ],
+      "id": "1d2ade67-f95c-4159-afed-0a5a1265bbc5",
+      "name": "Respuesta - Resultado final",
+      "notesInFlow": true,
+      "notes": "Devuelve el campo Respuesta final al cliente como texto plano con HTTP 200 y Content-Type: text/plain; charset=utf-8. Finaliza la solicitud recibida por el webhook."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let puntuacion = 0;\n\nif ($json[\"Nivel de azucar\"] === \"Alto\") puntuacion++;\nif ($json[\"Nivel de sal\"] === \"Alto\") puntuacion++;\nif ($json[\"Nivel de grasa\"] === \"Alto\") puntuacion++;\n\nreturn {\n  json: {\n    ...$json,\n    puntuacion_preocupacion: puntuacion\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2768,
+        -288
+      ],
+      "id": "9f58d1f7-2fe0-4103-bae3-270f3dfb1eeb",
+      "name": "Calculo - Puntuacion de preocupacion",
+      "notesInFlow": true,
+      "notes": "Cuenta cuántos nutrientes tienen nivel Alto entre azúcar, sal y grasa. Guarda el resultado, de 0 a 3, en puntuacion_preocupacion y conserva los demás datos. Procesa un solo producto por solicitud, sin arrays ni bucles."
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        5344,
+        224
+      ],
+      "id": "658af27e-467d-4a62-a726-e9e1b3ac6f50",
+      "name": "Modelo - Groq",
+      "notesInFlow": true,
+      "credentials": {
+        "groqApi": {
+          "id": "g8hUn8MYOSkAOC0b",
+          "name": "Groq account"
+        }
+      },
+      "notes": "Configura el modelo openai/gpt-oss-20b mediante una credencial de Groq. Proporciona el mismo modelo a las tres ramas de IA; cada rama define su tono mediante su propio prompt."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Entrada - Solicitud de código de barras": {
+      "main": [
+        [
+          {
+            "node": "Validacion - Existe barcode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validacion - Existe barcode": {
+      "main": [
+        [
+          {
+            "node": "Validacion - Barcode numerico",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta - Barcode faltante",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validacion - Barcode numerico": {
+      "main": [
+        [
+          {
+            "node": "Consulta - Open Food Facts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta - Barcode no numerico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consulta - Open Food Facts": {
+      "main": [
+        [
+          {
+            "node": "Validacion - Producto encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validacion - Producto encontrado": {
+      "main": [
+        [
+          {
+            "node": "Datos - Extraer informacion nutricional",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta - Producto no encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Extraer informacion nutricional": {
+      "main": [
+        [
+          {
+            "node": "Validacion - Datos nutricionales",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validacion - Datos nutricionales": {
+      "main": [
+        [
+          {
+            "node": "Clasificacion - Azucar alta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta - Datos insuficientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificacion - Azucar alta": {
+      "main": [
+        [
+          {
+            "node": "Datos - Azucar alto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clasificacion - Azucar media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificacion - Azucar media": {
+      "main": [
+        [
+          {
+            "node": "Datos - Azucar medio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Datos - Azucar bajo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Azucar alto": {
+      "main": [
+        [
+          {
+            "node": "Clasificacion - Sal alta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Azucar medio": {
+      "main": [
+        [
+          {
+            "node": "Clasificacion - Sal alta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Azucar bajo": {
+      "main": [
+        [
+          {
+            "node": "Clasificacion - Sal alta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificacion - Sal alta": {
+      "main": [
+        [
+          {
+            "node": "Datos - Sal alta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Datos - Sal no alta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Sal alta": {
+      "main": [
+        [
+          {
+            "node": "Clasificacion - Grasa alta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Sal no alta": {
+      "main": [
+        [
+          {
+            "node": "Clasificacion - Grasa alta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificacion - Grasa alta": {
+      "main": [
+        [
+          {
+            "node": "Datos - Grasa alta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Datos - Grasa no alta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Grasa alta": {
+      "main": [
+        [
+          {
+            "node": "Calculo - Puntuacion de preocupacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Grasa no alta": {
+      "main": [
+        [
+          {
+            "node": "Calculo - Puntuacion de preocupacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificacion - Semaforo no saludable": {
+      "main": [
+        [
+          {
+            "node": "Datos - Semaforo no saludable",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clasificacion - Semaforo moderado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificacion - Semaforo moderado": {
+      "main": [
+        [
+          {
+            "node": "Datos - Semaforo moderado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Datos - Semaforo saludable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Semaforo no saludable": {
+      "main": [
+        [
+          {
+            "node": "Validacion - Nutriscore disponible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Semaforo saludable": {
+      "main": [
+        [
+          {
+            "node": "Validacion - Nutriscore disponible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Semaforo moderado": {
+      "main": [
+        [
+          {
+            "node": "Validacion - Nutriscore disponible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validacion - Nutriscore disponible": {
+      "main": [
+        [
+          {
+            "node": "Clasificacion - Nutriscore no saludable",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clasificacion - Veredicto final no saludable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificacion - Nutriscore no saludable": {
+      "main": [
+        [
+          {
+            "node": "Datos - Nutriscore no saludable",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clasificacion - Nutriscore moderado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificacion - Nutriscore moderado": {
+      "main": [
+        [
+          {
+            "node": "Datos - Nutriscore moderado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Datos - Nutriscore saludable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Nutriscore no saludable": {
+      "main": [
+        [
+          {
+            "node": "Unir - Resultado Nutriscore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Nutriscore moderado": {
+      "main": [
+        [
+          {
+            "node": "Unir - Resultado Nutriscore",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Datos - Nutriscore saludable": {
+      "main": [
+        [
+          {
+            "node": "Unir - Resultado Nutriscore",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Unir - Resultado Nutriscore": {
+      "main": [
+        [
+          {
+            "node": "Clasificacion - Veredicto final no saludable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificacion - Veredicto final no saludable": {
+      "main": [
+        [
+          {
+            "node": "Datos - Veredicto final no saludable",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clasificacion - Veredicto final moderado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificacion - Veredicto final moderado": {
+      "main": [
+        [
+          {
+            "node": "Datos - Veredicto final moderado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Datos - Veredicto final saludable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Veredicto final moderado": {
+      "main": [
+        [
+          {
+            "node": "IA - Veredicto moderado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Veredicto final no saludable": {
+      "main": [
+        [
+          {
+            "node": "IA - Veredicto no saludable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datos - Veredicto final saludable": {
+      "main": [
+        [
+          {
+            "node": "IA - Veredicto saludable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA - Veredicto moderado": {
+      "main": [
+        [
+          {
+            "node": "Formato - Respuesta moderada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA - Veredicto no saludable": {
+      "main": [
+        [
+          {
+            "node": "Formato - Respuesta no saludable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA - Veredicto saludable": {
+      "main": [
+        [
+          {
+            "node": "Formato - Respuesta saludable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unir - Respuesta final": {
+      "main": [
+        [
+          {
+            "node": "Respuesta - Resultado final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formato - Respuesta no saludable": {
+      "main": [
+        [
+          {
+            "node": "Unir - Respuesta final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formato - Respuesta moderada": {
+      "main": [
+        [
+          {
+            "node": "Unir - Respuesta final",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Formato - Respuesta saludable": {
+      "main": [
+        [
+          {
+            "node": "Unir - Respuesta final",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Calculo - Puntuacion de preocupacion": {
+      "main": [
+        [
+          {
+            "node": "Clasificacion - Semaforo no saludable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modelo - Groq": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "IA - Veredicto no saludable",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "IA - Veredicto moderado",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "IA - Veredicto saludable",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a51e2624-6167-4f34-8d65-1fa591aadc73",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2ee90113f9094f1f4a0e7a73d056514ce56ad0d674a8b47cc4390830d88d8028"
+  },
+  "nodeGroups": [],
+  "id": "iWt1W3ZbFnD856u6",
+  "tags": []
+}
